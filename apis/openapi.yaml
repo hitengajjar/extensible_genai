@@ -1,0 +1,876 @@
+# -----------------------------------------------------------------------------
+# COPYRIGHT NOTICE
+# -----------------------------------------------------------------------------
+# This file is part of the Extensible Generative AI Platform service API documentation.
+# 
+# © Hiten Gajjar (hiten.gajjar@hotmail.com), 2024. All rights reserved.
+# 
+# Permission is hereby granted to view and copy this documentation for
+# personal and non-commercial use only. Distribution, modification, or any
+# other form of use requires explicit permission from the author.
+# 
+# For permission requests, please contact: hiten.gajjar@hotmail.com
+# 
+# THE DOCUMENTATION IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DOCUMENTATION OR
+# THE USE OR OTHER DEALINGS IN THE DOCUMENTATION.
+# -----------------------------------------------------------------------------
+
+# openapi: "3.0.3"
+openapi: "3.1.0"
+
+info:
+  title: Extensible GenAI Service
+  summary: Its an extensible generic Generative AI platform service.
+  description: Lists all the types and APIs for Extensible generic Generative AI platform service Architecture
+  version: 1.0.0
+  contact:
+    email: hiten.gajjar@hotmail.com
+  license:
+    name: Custom License
+    identifier: LICENSE.md
+    url: "http://LICENSE.md"
+
+servers:
+  - url: https://localhost/v1
+    description: Development server
+
+components:
+  schemas:
+    # $ref: './types.yaml'
+    ServerlessFunc:
+      description: |
+        Serverless function Interface definition. Concrete Implementation should provide source and define concrete input, output, and error parameters
+
+        This is very simple interface and it could be complicated based on the Serverless technology you may chose to use.
+      additionalProperties: false
+      properties:
+        description: 
+          type: string
+          description: Summary of what this function does
+        id: 
+          type: string 
+          format: uuid
+        name: 
+          type: string
+          description: Human readable function name
+        source: 
+          type: string
+          description: |
+            Function source code.
+            The language of source depends upon the Serverless technology you chose. 
+        interface_schema:
+          description: Input and Output (return) schema of this function
+          additionalProperties: false
+          properties:
+            input_params:
+              $ref: '#/components/schemas/JSONSchema'
+              # description: Function input parameters defined in JSONSchema packaged as string
+            returns:
+              $ref: '#/components/schemas/JSONSchema'
+              # description: Function return parameters defined in JSONSchema packaged as string
+          required: [input_params, returns]
+        required: [description, id, name, source, interface_schema]
+
+    ChatModule:
+      description: |
+        Chat module configuration. 
+
+        Its defined to be a simple class but it could have 
+          - license; configure licenses to check if client accessing the module has those
+          - quotas; configure client quotas.
+          - LLM selector; select LLM (e.g. OpenAI, Google PaLM 2, ..)
+          - Agent Memory manager; how to manage the context history 
+          - chat history retention rules; how long to keep the history
+          - anonyimizer; assume there are few anonymizer models available to chose from.
+      additionalProperties: false
+      properties:
+        id:
+          type: string 
+          format: uuid
+        name: 
+          type: string
+          description: human readable module name
+        description: 
+          type: string
+          description: human readable module description
+        initial_context: 
+          $ref: '#/components/schemas/JSONSchema'
+          description: Initial context defined in JSONSchema packaged as string.
+        intention_handlers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatIntentionHandler'
+          # description: There could be one or more chat Intention handler functions. Assumption is to have chat Intention handler per supported intention.
+        view_handler:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatViewHandler'
+        agent_prompt:
+          $ref: '#/components/schemas/PromptTmpl'
+          description: Agent prompt, used by the Chat Module to work with LLM
+      required:
+        [id, name, description, initial_context, intention_handlers, agent_prompt]
+      examples:
+        SecurityModule:
+          id: 0237f1dd-6393-43bd-ae52-0a457dc3aaa5
+          name: Security ChatBot
+          description: Security ChatBot addresses all the security requests
+          initial_context: |
+            {
+              "$schema": "http://json-schema.org/draft-07/schema#",
+              "$id": "http://json-schema.org/draft-07/schema#",
+              "title": "Security Chatbot Initial Schema",
+              "definitions": {
+                  "incident_id": {
+                      "type": "string", "format": "uuid",
+                      "description": "Unique identifier of a incident"
+                  },
+                  "workload_id": {
+                      "type": "string", "format": "uuid",
+                      "description": "Unique identifier of the workload"
+                  },
+                  "landing_page": {
+                      "type": "string",
+                      "description": "Page information from where chat is started",
+                  }
+            },
+          intention_handlers:
+            - $ref: '#/components/examples/ThreatUpdateIntentionHandler'
+            # TODO: define below examples
+            # - $ref: "#/components/examples/GeneralSecurityQuestionsIntentionHandler"
+            # - $ref: "#/components/examples/IncidentInvestigationIntentionHandler"
+            # - $ref: "#/components/examples/RemediationActionsIntentionHandler"
+            # - $ref: "#/components/examples/AssignTasksIntentionHandler"
+            # - $ref: "#/components/examples/PatchManagementIntentionHandler"
+            # - $ref: '#/components/examples/TaskAssignmentIntentionHandler'
+          view_handler:
+            $ref: '#/components/examples/SecurityWebViewHandler'
+          agent_prompt: |
+            You are a chatbot designed to assist users with specific cybersecurity features. Below are the supported features and their corresponding serverless function definitions:
+
+            Supported Features:
+            1. Security General Questions
+            2. Endpoint detection and management features:
+              - Threat updates
+              - Incident Investigation
+              - Remediation actions suggestion and execution
+              - Assigning tasks to individual
+              - Patch Management Assistance
+            
+            For above features you can use any of the following available tool
+            {{ IntentionHandler function definition }}
+
+            User Query: {{user_query}}
+
+            Response:
+
+            If the user query matches any of the supported features, provide the necessary assistance by invoking the corresponding serverless function. For any other questions, respond with:
+
+            "I'm sorry, I cannot handle this request. Please check our support website for further assistance."
+
+            ---
+
+            Examples of Handling Unsupported Queries:
+
+            1. **Unsupported Query**
+              - User Query: "Can you help me with my network configuration?"
+              - Response: "I'm sorry, I cannot handle this request. Please check our support website for further assistance."
+
+    PromptTmpl:
+      description: Prompt Template used to query LLM. 
+      type: string
+
+    ChatViewHandler:
+      description: |
+        To define client specific elements:
+          1. UI element (`view_constructors`) within chat window - are renderable HTML/CSS elements. e.g. render form, URLs, image, dialog box etc.
+             This way we can have different 
+          2. Action handling (`action_handlers`) - User actions on the UI e.g. click URL, submit form etc.
+
+        **Please note: ** 
+          1. This class is not a true reflection of UI Element and Action Handling.
+          2. It needs to be well-defined when this design needs to be used.
+      additionalProperties: false
+      properties:
+        client_type:
+          description: Different client types e.g. Web, Mobile, etc.
+          type: string
+        message_constructor:
+          # It will fetch messages from GenAI and construct it using UI elements and return it to the UI. 
+          $ref: '#/components/schemas/ServerlessFunc'
+        action_handlers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServerlessFunc'
+
+    KVPair:
+      description: Generic Key Value Pair Type
+      additionalProperties: false
+      properties:
+        key: 
+          type: string
+        value: 
+          type: object
+      required: 
+        [key, value]
+
+    SessionStatus:
+      type: object
+      description: Session status 
+      additionalProperties: false
+      properties: 
+        id: 
+          type: string 
+          format: uuid
+        state: 
+          type: string
+          description: |
+            Session state
+            ACTIVE - Session is active and can accept new messages from end user.
+            BUSY - Session is active but BUSY to receive any new messages
+            TERMINATED - Session is not active any more
+            ERROR - Session has encountered some error. Please refer optional details for further information. The example error case is LLM is not available or it didn't answer in specified time.
+          enum: [ACTIVE, BUSY, TERMINATED, ERROR]
+        details:
+          description: Optional details.
+          $ref: '#/components/schemas/KVPair'
+      required:
+        [id, state]
+
+    ChatIntentionHandler:
+      description: |
+        Intention handler function. Generally, one intention would need one handler.
+        GenAI will use the functions as tools for LLM. For this purpose, GenAI passes the function definitions to LLM.
+
+        It can use GenAI's LLM generated API in order to generate some text before returning the data.
+
+        Please note, for Dialog usecases, you can consider to have a workflow based approach instead of Serverless functions.
+      additionalProperties: false
+      properties:
+        func: 
+          $ref: '#/components/schemas/ServerlessFunc'
+        context:
+          $ref: '#/components/schemas/ChatSession'
+        prompt:
+          $ref: '#/components/schemas/PromptTmpl'
+      examples:
+        - "SecurityThreatUpdate":
+            $ref: '#/components/examples/ThreatUpdateIntentionHandler'
+        - "TaskAssignment":
+            $ref: '#/components/examples/TaskAssignmentIntentionHandler'
+
+    ChatSession:
+      description: Live chat session is handled using this class
+      additionalProperties: false
+      properties:
+          id: 
+            type: string 
+            format: uuid
+          initial_context:
+            type: object
+            description: Initial session context. The value should match the `ChatModule.initial_context`
+          created_at:
+            type: string
+            format: date-time
+            description: Session creation time
+          updated_at:
+            type: string
+            format: date-time
+            description: Last session update time 
+          status:
+            $ref: '#/components/schemas/SessionStatus'
+          module_id: 
+            type: string
+            format: uuid
+            description: Chat Module ID
+          message_ids:
+            type: array
+            description: Message ids in chronological order
+            items: 
+              type: string
+              format: uuid
+      required:
+        [id, initial_context, module_id]
+      examples:
+        $ref: '#/components/examples/SecurityChatSession'
+
+    JSONSchema:
+      additionalProperties: false
+      properties:
+        schema:
+          type: string
+          description: JSONSchema packaged as a string. Clients can set or update the session of a live chat.
+          examples: 
+            - "SecurityContext":
+                "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"session_id\":{\"type\":\"string\",\"format\":\"uuid\",\"description\":\"Unique identifier for the session\"},\"workload_id\":{\"type\":\"string\",\"format\":\"uuid\",\"description\":\"Unique identifier for the workload\"}},\"required\":[\"session_id\",\"workload_id\"],\"additionalProperties\":false}"
+
+    ChatActor:
+      description: Actor who plays part in the chat message. 
+      additionalProperties: false
+      properties:
+        id: 
+          type: string 
+          format: uuid
+          description: Message owner identifier. It could be chatbot (i.e. Chat Module's) ID or actual user's ID
+        type: 
+          description: Actor type.
+          type: string
+          enum: [BOT, HUMAN]
+      
+    ChatMessage:
+      description: Messages exchanged over the Chat session
+      additionalProperties: false
+      properties:
+        id:
+          type: string 
+          format: uuid
+        sender:
+          description: Message sender's information
+          $ref: '#/components/schemas/ChatActor'
+        receiver: 
+          description: Message receiver's information
+          $ref: '#/components/schemas/ChatActor'
+        msg:
+          type: string
+          description: Data in markdown format. You can make this part extensible to support different content-types.
+        session_id:
+          description: ChatSession ID. Messages are part of ChatSessions.
+          type: string 
+          format: uuid
+      required: 
+        [id, sender, msg, session_id]
+
+  examples:
+    SecurityInitialContext:
+      summary: Security chatbot initial context
+      value:
+        incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
+        workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
+        landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
+
+    SecurityChatSession:
+      summary: Chat Session example
+      value:
+        id: 64a425c3-a029-48c8-a591-b2bda6c45fc3
+        initial_context: 
+          $ref: '#/components/examples/SecurityInitialContext'
+        created_at: "2024-05-21T17:00:00Z"
+        updated_at: "2024-05-21T17:00:00Z"
+        status: ACTIVE
+        module_id: "0237f1dd-6393-43bd-ae52-0a457dc3aaa5"
+        message_ids: 
+          - "8c8eb023-3fe5-467d-9fc3-25f847a724d9"
+          - "f5fc0bcf-9e6d-4522-9b7f-21aa1e1fe1c7"
+          - "3151f6b7-4783-49e9-8dd1-bfca08a44349"
+          - "7cf913f2-256e-4160-a4ce-f0aaeee5e92a"
+          - "3e9aa558-6022-4f1d-af09-3fed197011e0"
+          - "bb4f8bc2-5e46-4950-819b-605783dfa0ff"
+          - "e33d7b62-2bd0-45da-982e-2503bb038080"
+          - "8b42d19c-8d35-4571-bc38-614f86104207"
+          - "ba2a8e44-4d9b-4fd9-b622-4a5af7148fe0"
+          - "bc29f8e2-25d2-4f47-a874-06c930be42b5"
+
+    TaskAssignmentIntentionHandler:
+      summary: Intention Handler example
+      value: 
+        - func: 
+            description: Assigns tasks to an individual.
+            id: 123e4567-e89b-12d3-a456-426614174004
+            name: TaskAssignment
+            source: |-
+              package main
+
+              import (
+                "encoding/json"
+                "fmt"
+              )
+
+              type Request struct {
+                Task     string `json:"task"`
+                Assignee string `json:"assignee"`
+              }
+
+              type Response struct {
+                Result string `json:"result"`
+              }
+
+              // Session represents the session-related information
+              type Session struct {
+                SessionID   string
+                IncidentID  string
+                WorkfloadID string
+              }
+              
+              func assignTask(task, assignee string) string {
+                // Implement your logic to assign the task
+                return "Task " + task + " assigned to " + assignee
+              }
+
+              // Assume that `Handler` is a standard function invoked by Serverless Runtime.
+              func Handler(ctx Session, req Request) (ChatResponse, error){ 
+                result := assignTask(request.Task, request.Assignee)
+                response := Response{Result: result}
+                return response, nil
+              }
+            context: '{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"session_id":{"type":"string","format":"uuid","description":"Unique identifier for the session"},"incident_id":{"type":"string","format":"uuid","description":"Unique identifier for the incident_id"},"workload_id":{"type":"string","format":"uuid","description":"Unique identifier for the workload"}},"required":["session_id","incident_id","workload_id"],"additionalProperties":false}'
+            interface_schema:
+              input: '{"type": "object", "properties": { "task": { "type": "string" }, "assignee": { "type": "string" } }, "required": ["task", "assignee"]}'
+              return: '{"type": "object", "properties": { "result": { "type": "string" } }, "required": ["result"]}'
+
+
+    ThreatUpdateIntentionHandler:
+      summary: Intention Handler example
+      value: 
+        - func: 
+            description: Provides the latest threat updates.
+            id: 123e4567-e89b-12d3-a456-426614174001
+            name: ThreatUpdates
+            source: |-
+              package threat_handler
+
+              import (
+                "encoding/json"
+                "fmt"
+              )
+
+              // Session represents the session-related information
+              type Session struct {
+                SessionID   string
+                IncidentID  string
+                WorkfloadID string
+              }
+
+              type Response struct {
+                Updates []string `json:"updates"`
+              }
+
+              func getThreatUpdates() []string {
+                // Implement your logic to get threat updates
+                return []string{"Update 1", "Update 2"}
+              }
+
+              // Assume that `Handler` is a standard function invoked by Serverless Runtime.
+              func Handler(ctx Session, req Request) (ChatResponse, error){ 
+                updates := getThreatUpdates()
+                response := Response{Updates: updates}
+                return response, nil
+              }
+            schema:
+              input_params: '{"type": "object", "properties": {} }'
+              returns: '{"type": "object", "properties": { "updates": { "type": "array", "items": { "type": "string" } } }, "required": ["updates"]}'
+          context: |
+            {
+              "$schema": "http://json-schema.org/draft-07/schema#",
+              "title": "Security Chatbot Intention handler session",
+              "type": "object",
+              "properties": {
+                "session_id": {
+                  "type": "string", "format": "uuid",
+                  "description": "Unique identifier of the session"
+                },
+                "incident_id": {
+                  "type": "string", "format": "uuid",
+                  "description": "Unique identifier of a incident"
+                },
+                "workload_id": {
+                  "type": "string", "format": "uuid",
+                  "description": "Unique identifier of the workload"
+                }
+              },
+              "required": [ "session_id", "incident_id", "workload_id" ],
+              "additionalProperties": false
+            }
+
+    SecurityWebViewHandler:
+      summary: Intention Handler example
+      value:
+        client_type: Web
+        message_constructor: |
+          package message_ctors
+          import (
+            "encoding/json"
+            "html/template"
+            "log"
+            "net/http"
+          )
+
+          // Session represents the session-related information
+          type Session struct {
+            SessionID     string
+          }
+
+          // Message represents a chat message
+          type Message struct {             // TODO: Should match to '#/components/schemas/ChatMessage'
+            SessionID   string `json:"session_id"`
+            InitiatedBy string `json:"initiated_by"`
+            Content     string `json:"content"`
+          }
+
+          // ChatResponse represents the response structure
+          type ChatResponse struct {
+            HTML string `json:"html"`
+          }
+
+          // FetchChatMessages fetches chat messages for a given session ID
+          func FetchChatMessages(sessionID string) ([]Message, error) {
+            // TODO: Fetch messages using GenAI **GET /messages** API
+            return messages, nil
+          }
+
+          // GenerateHTML generates HTML for chat messages
+          func GenerateHTML(messages []Message) (string, error) {
+            const templateStr = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                .bot-message { text-align: left; }
+                .human-message { text-align: right; }
+                .message { margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+                .tag { font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              {{range .}}
+                <div class="message {{if eq .InitiatedBy "BOT"}}bot-message{{else}}human-message{{end}}">
+                  <div class="tag">{{if eq .InitiatedBy "BOT"}}SecurityBot{{else}}Human{{end}}</div>
+                  <div>{{.Content}}</div>
+                </div>
+              {{end}}
+            </body>
+            </html>`
+
+            tmpl, err := template.New("chat").Parse(templateStr)
+            var htmlStr string
+            htmlBuilder := &htmlStr
+            err = tmpl.Execute(htmlBuilder, messages)
+            return htmlStr, nil
+          }
+
+          // Assume that `Handler` is a standard function invoked by Serverless Runtime.
+          func Handler(ctx Session, req Request) (ChatResponse, error) {
+            sessionID, ok := ctx.session_id.(string)
+            messages, err := FetchChatMessages(sessionID)
+            html, err := GenerateHTML(messages)
+            return ChatResponse{HTML: html}, nil
+          }
+        # action_handlers:
+          # TODO: Finish this part.
+
+  requestBodies:
+    ChatSession:
+      content:
+        application/json:
+          schema:
+            additionalProperties: false
+            properties:
+              module_id: 
+                type: string
+                format: uuid
+                description: Chat Module ID
+                example: "0237f1dd-6393-43bd-ae52-0a457dc3aaa5"
+              initial_context:
+                type: # any
+                description: Initial session context. The value should match the `ChatModule.initial_context`
+                example: 
+                  $ref: '#/components/examples/SecurityInitialContext'
+            required:
+              [initial_context, module_id]
+
+    ChatMessage:
+      content:
+        application/json:
+          schema:
+            additionalProperties: false
+            $ref: '#/components/schemas/ChatMessage'
+
+    ChatModule:
+      content:
+        application/json:
+          schema:
+            additionalProperties: false
+            $ref: '#/components/schemas/ChatModule'
+  
+  responses:
+    SessionStats:
+      description: Session Statistics
+      content:
+        application/json:
+          schema:
+            properties:
+              message_count: 
+                description: Number of messages exchanged on the session
+                type: integer
+              state: 
+                $ref: '#/components/schemas/SessionStatus'
+              created_at: 
+                description: Session creation timestamp
+                type: string
+                format: date-time
+              initiated_by:
+                description: Who initiated this session. In case of push chat feature where system will initiate the chat based on user browsing pattern.
+                $ref: '#/components/schemas/ChatActor'
+              updated_at: 
+                description: Session last updated timestamp. It can be used to determine the `age` of the session
+                type: string
+                format: date-time
+              llm_info:
+                description: LLM used by the chat session
+                properties:
+                  llm_model:
+                    type: string
+                    example: GPT-4o
+                  token_count: 
+                    description: Number of LLM tokens consumed by this chat session
+                    type: integer
+                  avg_responsetime: 
+                    description: Average response time from LLM
+                    type: number
+                    format: float
+              extra_details:
+                description: additional details about the chat session
+                properties:
+                  errors:
+                    description: Errors occured on the session so far.
+                    type: array
+                    items:
+                      type: string # TODO: this can be extended as you want
+                  sentiment:
+                    description: Customer sentiment so far on this chat
+                    type: string
+                    enum: [POSITIVE, NEGATIVE, NEUTRAL, MIXED]
+
+  parameters:
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      description: ID of a Chat session
+      schema:
+        type: string 
+        format: uuid
+    
+    ChatModuleId:
+      name: module_id
+      in: path
+      description: ID of a Chat Module
+      required: true
+      schema:
+        type: string 
+        format: uuid
+
+paths:
+  /chat_modules:
+    post:
+      summary: Create new Chat Module in the system
+      operationId: CreateChatModule
+      requestBody:
+        $ref: '#/components/requestBodies/ChatModule'
+      responses:
+        '201': 
+          description: Chat Module is registered in the system
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: 
+                    type: string 
+                    format: uuid
+                    description: Chat Module ID
+        '400':
+          description: Request error
+    get:
+      summary: Get all the chat modules configured in the system
+      operationId: GetChatModules
+      responses:
+        '200':
+          description: ChatModules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatModule'
+
+  /chat_modules/{module_id}:
+    put:
+      summary: Chat module update
+      operationId: UpdateChatModule
+      requestBody:
+        $ref: '#/components/requestBodies/ChatModule'
+      parameters:
+        - $ref: '#/components/parameters/ChatModuleId'
+      responses:
+        '200': 
+          description: Chat module is updated
+          content:
+            application/json:
+              schema:
+                properties:
+                  module_id: 
+                    type: string 
+                    format: uuid
+        '400':
+          description: Request error
+        '404':
+          description: Chat Module not found
+
+  /sessions:
+    post:
+      summary: Create Chat session
+      operationId: CreateChatSession
+      requestBody:
+        $ref: '#/components/requestBodies/ChatSession'
+      responses:
+        '201': 
+          description: Session object is created
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: 
+                    type: string 
+                    format: uuid
+                    description: Chat Session ID
+        '400':
+          description: Request error
+
+  /session/{session_id}:
+    get:
+      summary: Get Session details by ID
+      operationId: GetSessionById
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+              example: 
+                $ref: '#/components/examples/SecurityChatSession'
+
+        '404':
+          description: Session ID not found
+
+  /session/{session_id}/state:
+    get: 
+      summary: Get session state
+      description: >
+        Get session state. Service determines the state of a session.
+        Its useful to clients to decide on how users can interact with the chat.
+      operationId: GetSessionState
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionStatus'
+
+  /session/{session_id}/stats:
+    get:
+      summary: Provides statistics of a session
+      description: Provides live status of a session
+      operationId: SessionStatistics
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session Status
+          $ref: '#/components/responses/SessionStats'
+
+  /session/{session_id}/messages:
+    post:
+      summary: Create a new message in a Chat Session
+      operationId: PostMessage
+      requestBody:
+        $ref: '#/components/requestBodies/ChatMessage'
+      parameters:
+        - name: session_id
+          in: path
+          description: ID of a Chat session
+          required: true
+          schema:
+            type: string 
+            format: uuid
+      responses:
+        '201': 
+          description: Message object is created
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: 
+                    type: string 
+                    format: uuid
+                    description: Message Id
+        '400':
+          description: Request error
+        
+        '404':
+          description: Session not found
+
+    get:
+      summary: Get all the messages in a Chat Session
+      operationId: GetMessages
+      parameters:
+        - name: session_id
+          in: path
+          description: ID of a Chat session
+          required: true
+          schema:
+            type: string 
+            format: uuid
+        - name: last_msg_id
+          in: query
+          description: |
+            Query messages since `last_msg_id`. If its missing, then fetch all the messages. 
+            TODO: Need to consider pagination
+          required: false
+          schema:
+            type: string 
+            format: uuid
+      responses:
+        '200':
+          description: Requested messages on the session. In case of no messages it will return empty array
+          content:
+            application/json:
+              schema:
+                properties:
+                  count: 
+                    type: integer
+                    description: Total items returned by the server
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+        '404':
+          description: Session ID not found
+
+  /llm/messages:
+    post:
+      summary: Generate LLM message
+      operationId: GenerateLLMMessage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              description: Prompt for LLM to generate the data. It supports markdown content type.
+      responses:
+        '200':
+          description: Generated LLM message 
+          content:
+            application/json:
+              schema:
+                type: string
+                description: Generated text. The data will be in requested content-type. It all depends on the prompt's instruction for output generation. By default it will be text with markdown content.

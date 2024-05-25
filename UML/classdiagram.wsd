@@ -1,0 +1,92 @@
+@startuml
+
+title Extensible GenAI Service Schemas Diagram
+
+entity ChatActor {
+    id: UUID
+    type: String
+}
+
+entity ChatMessage {
+    * id: UUID
+    * sender: ChatActor
+    receiver: ChatActor
+    * msg: String
+    * session_id: UUID
+}
+
+entity ChatModule {
+    * id: UUID
+    * name: String
+    initial_context: JSONSchema
+    * usecase_handlers: List<ChatUsecaseHandler>
+    view_handler: ChatViewHandler
+    * agent_prompt: String
+}
+
+entity ChatSession {
+    * id: UUID
+    * initial_context: Object
+    created_at: Date
+    updated_at: Date
+    status: SessionStatus
+    * module_id: UUID
+    messages: List<ChatMessage>
+}
+
+entity ChatUsecaseHandler {
+    func: ServerlessFunc
+    context: ChatSession
+}
+
+entity ChatViewHandler {
+    view_constructors: List<ServerlessFunc>
+    action_handlers: List<ServerlessFunc>
+}
+
+entity JSONSchema {
+    schema: String
+}
+
+entity KVPair {
+    * key: String
+    * value: Object
+}
+
+entity ServerlessFunc {
+    description: String
+    id: UUID
+    name: String
+    source: String
+    interface_schema: ServerlessFuncInterfaceSchema
+}
+
+entity ServerlessFuncInterfaceSchema {
+    * input_params: JSONSchema
+    * returns: JSONSchema
+}
+
+entity SessionStatus {
+    * id: UUID
+    * state: String
+    details: KVPair
+}
+
+
+ChatViewHandler -- "0..*" ServerlessFunc : view_constructors
+ChatViewHandler -- "0..*" ServerlessFunc : action_handlers
+ChatMessage -- ChatActor : sender
+ChatMessage -- ChatActor : receiver
+SessionStatus -- KVPair : details
+ServerlessFuncInterfaceSchema -- JSONSchema : input_params
+ServerlessFuncInterfaceSchema -- JSONSchema : returns
+ServerlessFunc -- ServerlessFuncInterfaceSchema : interface_schema
+ChatSession -- SessionStatus : status
+ChatSession -- "0..*" ChatMessage : messages
+ChatUsecaseHandler -- ServerlessFunc : func
+ChatUsecaseHandler -- ChatSession : context
+ChatModule -- JSONSchema : initial_context
+ChatModule -- "0..*" ChatUsecaseHandler : usecase_handlers
+ChatModule -- ChatViewHandler : view_handler
+
+@enduml

@@ -1,1 +1,1 @@
-# extensible_genai
+# Extensible Generic GenAI Platform Service
