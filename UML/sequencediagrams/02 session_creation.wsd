@@ -1,0 +1,51 @@
+@startuml
+
+title
+<u>Use Case:</u> Sequence diagram for Starting a chat session                                                 
+<u>Disclaimer</u>: This diagram is provided for illustrative purposes only and may omit certain 
+   details for clarity and brevity. Users are encouraged to adapt and extend
+   the diagram to fit their specific business requirements and use cases.
+<u>License</u>: https://github.com/hitengajjar/extensible_genai/blob/main/LICENSE.md             
+End title
+
+autonumber
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+skinparam sequenceArrowThickness 2
+
+participant Client as C
+
+box "Serverless Runtime\n Engine" #LightBlue
+participant "View Handlers" as VH
+end box
+
+box "PlatformServices" #LightBlue 
+participant IdP
+participant GenAIService as GenAI
+database DB
+end box
+
+group Create Session
+  C -> GenAI: **POST** /sessions \n\
+|_ id: ""//__session_uuid__//"" \n\
+|_ initial_context: ""//__context_json__//"" \n\
+|_ module_id: ""//__module_uuid__//""
+
+  GenAI -> IdP: Validate client
+  return **200 OK**
+
+  note over GenAI
+    Validate below and proceed if all well
+      - request
+      - quota consumption
+      - validate license 
+      - .. & more
+  end note
+
+  GenAI -> GenAI: create session
+  GenAI -> DB: store session details
+  return success
+  GenAI --> C: **200 OK** {id: ""//__session_uuid__//""}
+end
+@enduml

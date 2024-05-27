@@ -1,0 +1,53 @@
+@startuml
+
+title
+<u>Use Case:</u> Sequence diagram for Client to retrieve chatbot messages and render               
+<u>Disclaimer</u>: This diagram is provided for illustrative purposes only and may omit certain 
+   details for clarity and brevity. Users are encouraged to adapt and extend
+   the diagram to fit their specific business requirements and use cases.
+<u>License</u>: https://github.com/hitengajjar/extensible_genai/blob/main/LICENSE.md             
+End title
+
+autonumber
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+skinparam sequenceArrowThickness 2
+
+participant Client as C
+
+box "Serverless Runtime\n Engine" #LightBlue
+participant "View Handlers" as VH
+end box
+
+box "PlatformServices" #LightBlue 
+participant IdP
+participant GenAIService as GenAI
+database DB
+end box
+
+note over C, GenAI
+  <font size=18>The design proposal is using simple polling technique
+  <font size=18>but you can consider [[https://httpwg.org/specs/rfc7540.html HTTP/2]] stream (bidirectional flow of frames)
+end note
+
+group Chat message retrieval
+  loop till chat session alive
+    C -> VH: **POST** /execute\n{message_constructor function, \nlast_msg_id=...}
+    
+    VH -> GenAI: **GET** /session/:""//__session_uuid__//""/messages\n?last_msg_id=:""//__message_uuid__//""
+    GenAI -> DB: Fetch all messages \nafter ""//__message_uuid__//""
+    Alt No Messages 
+      GenAI --> C: **200 OK** \n {count: 0, \n items:[]}
+      C -> C: Exponential Backoff
+    Else Messages are available
+      GenAI --> VH: **200 OK** \n{ count: ..., \nitems: [{...},{...},...] }
+      VH -> VH: Construct Chat View \nwith message contents
+      VH --> C: **200 OK** { chat_view: [...]}
+      C -> C: Render messages on UI
+    End 
+  end
+end
+
+
+@enduml

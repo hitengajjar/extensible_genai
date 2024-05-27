@@ -1,0 +1,123 @@
+@startuml
+
+title 
+<u>Use Case:</u> Sequence diagram for Administration of Chat modules                                    
+<u>Disclaimer</u>: This diagram is provided for illustrative purposes only and may omit certain 
+   details for clarity and brevity. Users are encouraged to adapt and extend
+   the diagram to fit their specific business requirements and use cases.
+<u>License</u>: https://github.com/hitengajjar/extensible_genai/blob/main/LICENSE.md             
+End title
+
+autonumber
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+skinparam sequenceArrowThickness 2
+
+participant Client as C
+
+box "PlatformServices" #LightBlue 
+participant GenAIService as GenAI
+participant IdP
+participant "Serverless Runtime" as SR
+database DB
+end box
+
+C -> GenAI: **POST** /chat_modules \n\
+|_ id: ""//__module_id__//"" \n\
+|_ name: ""//__module_name__//"" \n\
+|_ initial_context_schema: ""//__JSONSchema__//"" \n\
+|_ intention_handlers: ""//__intention_handlers_definitions__//"" \n\
+|_ view_handler: ""//__view_handler_definition__//"" \n\
+|_ agent_prompt: ""//__agent_prompt__//""
+
+note right of GenAI
+Consider below example
+
+- SecurityModule:
+    id: 0237f1dd-6393-43bd-ae52-0a457dc3aaa5
+    name: Security ChatBot
+    description: Security ChatBot addresses all the security requests
+    initial_context: ...
+    intention_handlers:
+      - func: 
+          id: 123e4567-e89b-12d3-a456-426614174004
+          name: TaskAssignment
+          description: Assigns tasks to an individual.
+          lang: GO
+          interface_schema::
+            input_params: ...
+            returns: ...
+          source: ...
+        context: ...
+      - func: 
+          id: 123e4567-e89b-12d3-a456-426614174001
+          name: ThreatUpdates
+          description: Provides the latest threat updates.
+          lang: GO
+          interface_schema:
+            input_params: ...
+            returns: ...
+          source: ...
+          prompt: ...
+        context: ...
+    view_handler:
+      client_type: Web
+      message_constructor: 
+        id: 123e4567-e89b-12d3-a456-426614174001
+        name: SecurityWebViewMessageConstructorFunc
+        description: Message View Constructor Implementation
+        lang: GO
+        interface_schema:
+          input_params: ...
+          returns: ...
+        source: ...
+      action_handlers: 
+        - id: 21740f07-562c-48ec-b533-3c9d5499b0c1
+          name: FeedbackActionHandlerFunc
+          description: Feedback Action handler
+          lang: GO
+          interface_schema:
+            input_params: ...
+            returns: ...
+          source: ...
+        - id: 7eeb86bb-1f21-4579-9661-dc91601cda59
+          name: URLClickActionHandlerFunc
+          description: URLClick Action handler
+          lang: GO
+          interface_schema: input_params: ...
+            returns: ...
+          source: ...
+    embeddings_data_generator:
+      func: 
+        id: 4852edb2-5b34-46e2-8557-74b94687fb4e
+        name: EmbeddingsGenerator
+        description: Generate embeddings for the feed documents
+        lang: GO
+        interface_schema:
+          input_params: ...
+          returns: ...
+        source: ...
+      cron: 0 0 * * * # 12 midnight every day
+    agent_prompt: |-
+      
+end note
+
+GenAI -> IdP: validate client
+return **200 OK**
+
+GenAI -> DB: SELECT EXISTS (SELECT 1 FROM \nCHAT_MODULES WHERE id = ..);
+return result
+Alt new module
+  GenAI -> SR: Register \n\
+|_ intention_handler[{...},{...},...] \n\
+|_ view_handler.message_constructor {...}\n\
+|_ view_hanler.action_handlers[{...},{...},...]
+  return **200 OK** success
+  GenAI -> DB: Register ChatModule
+  GenAI --> C: **201 Created** {id: ...}
+Else existing module
+  GenAI -> C: **409 Conflict**
+End
+
+@enduml

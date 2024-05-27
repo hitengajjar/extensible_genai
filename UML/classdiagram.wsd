@@ -4,7 +4,13 @@ title Extensible GenAI Service Schemas Diagram
 
 entity ChatActor {
     id: UUID
-    type: String
+    * type: String
+}
+
+entity ChatIntentionHandler {
+    func: ServerlessFunc
+    context: ChatSession
+    prompt: String
 }
 
 entity ChatMessage {
@@ -18,9 +24,10 @@ entity ChatMessage {
 entity ChatModule {
     * id: UUID
     * name: String
-    initial_context: JSONSchema
-    * usecase_handlers: List<ChatUsecaseHandler>
-    view_handler: ChatViewHandler
+    * description: String
+    * initial_context: JSONSchema
+    * intention_handlers: List<ChatIntentionHandler>
+    view_handler: List<ChatViewHandler>
     * agent_prompt: String
 }
 
@@ -31,17 +38,28 @@ entity ChatSession {
     updated_at: Date
     status: SessionStatus
     * module_id: UUID
-    messages: List<ChatMessage>
-}
-
-entity ChatUsecaseHandler {
-    func: ServerlessFunc
-    context: ChatSession
+    message_ids: List<UUID>
 }
 
 entity ChatViewHandler {
-    view_constructors: List<ServerlessFunc>
+    client_type: String
+    message_constructor: ServerlessFunc
     action_handlers: List<ServerlessFunc>
+}
+
+entity Document {
+    metadata: DocumentMetadata
+    data: DocumentData
+}
+
+entity DocumentData {
+}
+
+entity DocumentMetadata {
+    name: String
+    type: String
+    tags: List<String>
+    module_id: UUID
 }
 
 entity JSONSchema {
@@ -54,11 +72,11 @@ entity KVPair {
 }
 
 entity ServerlessFunc {
-    description: String
-    id: UUID
-    name: String
-    source: String
-    interface_schema: ServerlessFuncInterfaceSchema
+    * description: String
+    * id: UUID
+    * name: String
+    * source: String
+    * interface_schema: ServerlessFuncInterfaceSchema
 }
 
 entity ServerlessFuncInterfaceSchema {
@@ -72,21 +90,30 @@ entity SessionStatus {
     details: KVPair
 }
 
+entity EmbeddingsDataGenerator {
+    func: ServerlessFunc
+}
 
-ChatViewHandler -- "0..*" ServerlessFunc : view_constructors
+
+ChatViewHandler -- ServerlessFunc : message_constructor
 ChatViewHandler -- "0..*" ServerlessFunc : action_handlers
 ChatMessage -- ChatActor : sender
 ChatMessage -- ChatActor : receiver
-SessionStatus -- KVPair : details
 ServerlessFuncInterfaceSchema -- JSONSchema : input_params
 ServerlessFuncInterfaceSchema -- JSONSchema : returns
-ServerlessFunc -- ServerlessFuncInterfaceSchema : interface_schema
+Document -- DocumentData : data
+Document -- DocumentMetadata: metadata
 ChatSession -- SessionStatus : status
 ChatSession -- "0..*" ChatMessage : messages
-ChatUsecaseHandler -- ServerlessFunc : func
-ChatUsecaseHandler -- ChatSession : context
+SessionStatus -- KVPair : details
+ServerlessFunc -- ServerlessFuncInterfaceSchema : interface_schema
+EmbeddingsDataGenerator -- ServerlessFunc : func
+EmbeddingsDataGenerator -- "0..*" Document
+ChatIntentionHandler -- ServerlessFunc : func
+ChatIntentionHandler -- ChatSession : context
 ChatModule -- JSONSchema : initial_context
-ChatModule -- "0..*" ChatUsecaseHandler : usecase_handlers
+ChatModule -- "0..*" ChatIntentionHandler : intention_handlers
 ChatModule -- ChatViewHandler : view_handler
+ChatModule -- EmbeddingsDataGenerator: embeddings_provider
 
 @enduml

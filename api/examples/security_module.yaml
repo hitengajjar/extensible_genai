@@ -1,0 +1,423 @@
+# -----------------------------------------------------------------------------
+# COPYRIGHT NOTICE
+# -----------------------------------------------------------------------------
+# This file is an example of Security Module.
+# Its part of  for Extensible Generative AI Platform service.
+# 
+# © Hiten Gajjar (hiten.gajjar@hotmail.com), 2024. All rights reserved.
+# 
+# Permission is hereby granted to view and copy this documentation for
+# personal and non-commercial use only. Distribution, modification, or any
+# other form of use requires explicit permission from the author.
+# 
+# For permission requests, please contact: hiten.gajjar@hotmail.com
+# 
+# THE DOCUMENTATION IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DOCUMENTATION OR
+# THE USE OR OTHER DEALINGS IN THE DOCUMENTATION.
+# -----------------------------------------------------------------------------
+
+
+# We need to have following definitions
+# 1. Chat Module
+# 2. Agent Prompt 
+# 3. Initial Context definition
+# 4. IntentionHandler functions
+# 5. View Handler functions
+# 6. Embeddings Data Generator functions
+
+components:
+  examples:
+    SecurityChatModule:
+      id: 0237f1dd-6393-43bd-ae52-0a457dc3aaa5
+      name: Security ChatBot
+      description: Security ChatBot addresses security incident related questions and assists in taking actions.
+      initial_context_schema: 
+        $ref: '#/components/examples/InitialContextSchema'          
+      intention_handlers:
+        - $ref: '#/components/examples/ThreatUpdateIntentionHandler'
+        - $ref: "#/components/examples/TaskAssignmentIntentionHandler"
+        - $ref: "#/components/examples/IncidentDetailsIntentionHandler"
+        - $ref: "#/components/examples/RemediationActionsIntentionHandler"
+      view_handler:
+        $ref: '#/components/examples/SecurityWebViewHandler'
+      embeddings_provider:
+        $ref: '#/components/examples/SecurityEmbeddingsDataGenerator'
+      agent_prompt: 
+        $ref: '#/components/examples/SecurityAgentPrompt'
+      
+    SecurityAgentPrompt: |-
+      You are a chatbot designed to assist users with specific cybersecurity features. Below are the supported features and their corresponding serverless function definitions:
+
+      Supported Features:
+      1. Security General Questions
+      2. Endpoint detection and management features:
+        - Threat updates
+        - Incident Investigation
+        - Remediation actions suggestion and execution
+        - Assigning tasks to individual
+        - Patch Management Assistance
+      
+      For above features you can use any of the following available tool
+      {{ IntentionHandler function definition }}
+
+      User Query: {{user_query}}
+
+      Response:
+
+      If the user query matches any of the supported features, provide the necessary assistance by invoking the corresponding serverless function. For any other questions, respond with:
+
+      "I'm sorry, I cannot handle this request. Please check our support website for further assistance."
+
+      ---
+
+      Examples of Handling Unsupported Queries:
+
+      1. **Unsupported Query**
+        - User Query: "Can you help me with my network configuration?"
+        - Response: "I'm sorry, I cannot handle this request. Please check our support website for further assistance."
+
+    InitialContextSchema: |-
+      {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$id": "http://json-schema.org/draft-07/schema#",
+        "title": "Security Chatbot Initial Schema",
+        "definitions": {
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of a incident"
+          },
+          "workload_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the workload"
+          },
+          "landing_page": {
+            "type": "string",
+            "description": "Page information from where chat is started"
+          }
+        }
+      }
+
+  # Intention Handler serverless function definitions
+    SecurityIntentionHandlerContextSchema: |-
+      {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the session"
+          },
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the incident_id"
+          },
+          "workload_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the workload"
+          }
+        },
+        "required": [
+          "session_id",
+          "incident_id",
+          "workload_id"
+        ],
+        "additionalProperties": false
+      }
+
+    TaskAssignmentIntentionHandler:
+      func: 
+        id: 123e4567-e89b-12d3-a456-426614174004
+        name: TaskAssignment
+        description: Assigns tasks to an individual.
+        interface_schema:
+          input_params: '{"description":"Task input","additionalProperties":false,"properties":{"task":{"type":"string"},"assignee":{"type":"string"}},"required":["task","assignee"]}'
+          returns: '{"description":"Task execution result","additionalProperties":false,"properties":{"result":{"type":"string"}},"required":["result"]}'
+        source: |-
+          package main
+
+          import (
+            "encoding/json"
+            "fmt"
+          )
+
+          type Request struct {
+            Task     string `json:"task"`
+            Assignee string `json:"assignee"`
+          }
+
+          type Response struct {
+            Result string `json:"result"` # TODO: should be ChatMessage[]
+          }
+
+          // Session represents the session-related information
+          type Session struct {
+            SessionID   string
+            IncidentID  string
+            WorkfloadID string
+          }
+          
+          func assignTask(task, assignee string) string {
+            // Implement your logic to assign the task
+            return "Task " + task + " assigned to " + assignee
+          }
+
+          // Assume that `Handler` is a standard function invoked by Serverless Runtime.
+          func Handler(ctx Session, req Request) (ChatResponse, error){ 
+            result := assignTask(request.Task, request.Assignee)
+            response := Response{Result: result}
+            return response, nil
+          }
+      context:
+        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+
+    ThreatUpdateIntentionHandler:
+      func: 
+        description: Provides the latest threat updates.
+        id: 123e4567-e89b-12d3-a456-426614174001
+        name: ThreatUpdates
+        interface_schema:
+          input_params: '{"description":"No input","additionalProperties":false,"properties":{}'
+          returns: '{"description":"Threat updates.","additionalProperties":false,"properties":{"updates":{"type":"array","items":{"type":"string"}}},"required":["updates"]}'
+        source: |- # Notice: Below source is provided as a logical example and correctness isn't checked. Please use it at your own discretion.
+          package threat_handler
+
+          import (
+            "encoding/json"
+            "fmt"
+          )
+
+          // Session represents the session-related information
+          type Session struct {
+            SessionID   string
+            IncidentID  string
+            WorkfloadID string
+          }
+
+          type Response struct { 
+            Updates []string `json:"updates"` # TODO: Should be ChatMessage[] 
+          }
+
+          func getThreatUpdates() []string {
+            // Implement your logic to get threat updates
+            return []string{"Update 1", "Update 2"}
+          }
+
+          // Assume that `Handler` is a standard function invoked by Serverless Runtime.
+          func Handler(ctx Session, req Request) (ChatResponse, error){ 
+            updates := getThreatUpdates()
+            response := Response{Updates: updates}
+            return response, nil
+          }
+      prompt: |-
+        You're a security analyst providing updates on potential threats for the incident.
+        
+        Compose a response to a colleague summarizing the latest threat intelligence, 
+        including details such as the nature of the threat, potential impact,
+        and any pertinent updates or developments. 
+        
+        Please include threats: {{ THREAT_DETAILS }}
+      context:
+        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+
+    IncidentDetailsIntentionHandler:
+      func: 
+        description: |-
+          Provides the incident details along with some filtering mechanism to retrieve specific data like
+          * incident investigation data
+          * suspicious processes and files
+          * filter by files, processes, registry items
+          * existing remediation actions on the incident
+        id: 72e808bb-d534-4da2-a9c1-7658f7015fc4
+        name: IncidentDetails
+        interface_schema:
+          input_params: '{"description":"Task input","additionalProperties":false,"properties":{"investigation_data":{"type":"boolean"},"suspicious_data":{"type":"boolean"},"filterby":{"type":"array","items":{"properties":{"files":{"type":"string"},"processes":{"type":"string"},"registry":{"type":"string"}}}},"remediation_actions":{"type":"boolean"}},"required":["task","assignee"]}'
+          returns: '{"description":"Threat updates.","additionalProperties":false,"properties":{"incident":{"type":"object"}}}'
+        source: ... # Provide your source code here.
+      prompt: |-
+        You're a security analyst providing easy to understand incident information for below given incident details.
+        Incident details: {{ INCIDENT_DETAILS }}
+      context:
+        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+    
+    RemediationActionsIntentionHandler:
+      func: 
+        description: Initiates the remediation action in Security Backend system and generates human readable response
+        id: 72e808bb-d534-4da2-a9c1-7658f7015fc4
+        name: RemediationActions
+        interface_schema:
+          input_params: ... # Provide input schema
+          returns: ... # Provide output schema
+        source: ... # Provide your source code here.
+      context:
+        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+
+  # View Handler 
+    SecurityWebViewHandler:
+      client_type: Web
+      message_constructor: 
+        description: Message View Constructor Implementation
+        id: 123e4567-e89b-12d3-a456-426614174001
+        name: SecurityWebViewMessageConstructorFunc
+        interface_schema:
+            input_params: '{"description":"Chat message content.","additionalProperties":false,"properties":{"message":{"type":"string"}},"required":["message"]}'
+            returns: '{"$schema":"http://json-schema.org/draft-07/schema#","title":"ChatMessages","description":"A collection of messages exchanged over the Chat session","type":"array","items":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","format":"uuid"},"sender":{"description":"Message senders information","$ref":"#/definitions/ChatActor"},"receiver":{"description":"Message receivers information","$ref":"#/definitions/ChatActor"},"msg":{"type":"string","description":"Data in markdown format. You can make this part extensible to support different content-types."},"session_id":{"type":"string","format":"uuid","description":"ChatSession ID. Messages are part of ChatSessions."}},"required":["id","sender","msg","session_id"]},"definitions":{"ChatActor":{"description":"Actor who plays part in the chat message.","type":"object","additionalProperties":false,"properties":{"id":{"type":"string","format":"uuid","description":"Message owner identifier. It could be chatbot (i.e. Chat Modules) ID or actual users ID"},"type":{"description":"Actor type.","type":"string","enum":["BOT","HUMAN"]}},"required":["type"]}}}'
+        source: |- # Notice: Below source is provided as a logical example and correctness isn't checked. Please use it at your own discretion.
+          package message_ctors
+          import (
+            "encoding/json"
+            "fmt"
+            "github.com/google/uuid"
+            "html/template"
+            "log"
+            "net/http"
+          )
+
+          // Session represents the session-related information
+          type Session struct {
+            SessionID string `json:"session_id"`
+          }
+
+          // ChatMessage represents messages exchanged over the chat session
+          type ChatMessage struct {
+            ID        uuid.UUID `json:"id" validate:"required,uuid"`
+            Sender    ChatActor `json:"sender" validate:"required"`
+            Receiver  ChatActor `json:"receiver,omitempty"` // receiver is optional based on OpenAPI schema
+            Msg       string    `json:"msg" validate:"required"`
+            SessionID uuid.UUID `json:"session_id" validate:"required,uuid"`
+          }
+
+          // ChatActor represents the message sender's or receiver's information
+          type ChatActor struct {
+            ID   uuid.UUID `json:"id" validate:"required,uuid"`
+            Type string    `json:"type" validate:"required,oneof=BOT HUMAN"`
+          }
+
+          // ChatResponse represents the response structure
+          type ChatResponse struct {
+            Messages []ChatMessage `json:"messages"` 
+          }
+
+          // FetchChatMessages fetches chat messages for a given session ID
+          func FetchChatMessages(sessionID string) ([]ChatMessage, error) {
+            // TODO: Fetch messages using GenAI **GET /messages** API
+            return messages, nil
+          }
+
+          // GenerateHTML generates HTML for chat messages
+          func GenerateHTML(msg ChatMessage) (string, error) {
+            const templateStr = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                .bot-message { text-align: left; }
+                .human-message { text-align: right; }
+                .message { margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+                .tag { font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              {{range .}}
+                <div class="message {{if eq .Sender.Type "BOT"}}bot-message{{else}}human-message{{end}}">
+                  <div class="tag">{{if eq .Sender.Type "BOT"}}SecurityBot{{else}}Human{{end}}</div>
+                  <div>{{.Msg}}</div>
+                </div>
+              {{end}}
+            </body>
+            </html>`
+
+            tmpl, err := template.New("chat").Parse(templateStr)
+            if err != nil {
+              return "", err
+            }
+
+            var htmlStr string
+            htmlBuilder := &htmlStr
+            err = tmpl.Execute(htmlBuilder, msg.Msg)
+            if err != nil {
+              return "", err
+            }
+
+            return htmlStr, nil
+          }
+
+          // Handler processes the session context and request, and returns a chat response
+          func Handler(ctx Session, req Request) (ChatResponse, error) {
+            sessionID := ctx.SessionID
+            messages, err := FetchChatMessages(sessionID)
+            if err != nil {
+              log.Printf("Error fetching messages: %v", err)
+              return ChatResponse{}, fmt.Errorf("internal server error")
+            }
+
+            for i, msg := range messages {
+              html, err := GenerateHTML([]ChatMessage{msg})
+              if err != nil {
+                log.Printf("Error generating HTML for message ID %s: %v", msg.ID, err)
+                return ChatResponse{}, fmt.Errorf("internal server error")
+              }
+              messages[i].Msg = html
+            }
+
+            return ChatResponse{Messages: messages}, nil
+          }
+      action_handlers: 
+        # Notice: You can provide specific action handlers. 
+        # Examples: URL click initiate some backend task, form submission, feedback capture etc.
+
+  # Embeddings Data Generator serverless function
+    SecurityEmbeddingsDataGenerator:
+      func: 
+        description: Generate embeddings for the feed documents
+        id: 4852edb2-5b34-46e2-8557-74b94687fb4e
+        name: EmbeddingsGenerator
+        lang: GO
+        interface_schema:
+          input_params: '{"description":"Document source location","additionalProperties":false,"properties":{"data_location":{"type":"string"},"security_backend_connection":{"type":"object","properties":{"url":{"type":"string"}}}},"required":["data_location"]}'
+          returns: '{"description":"Threat updates.","additionalProperties":false,"properties":{"result":{"type":"boolean"}}}'
+        source: |-
+          ...
+          # Logic includes:
+          # 1. Fetch all the documents from the `data_location` and push to GenAI using API `POST /embeddings/documents`
+          # 2. Fetch incident details from Security backend system and push to GenAI using API `POST /embeddings/documents`
+      cron: 0 0 * * * # 12 midnight every day
+
+  # Few Live object examples
+    SecurityInitialContext:
+      summary: Security chatbot initial context
+      value:
+        incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
+        workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
+        landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
+
+    SecurityChatSession:
+      summary: Chat Session example
+      value:
+        id: 64a425c3-a029-48c8-a591-b2bda6c45fc3
+        initial_context: 
+          $ref: '#/components/examples/SecurityInitialContext'
+        created_at: "2024-05-21T17:00:00Z"
+        updated_at: "2024-05-21T17:00:00Z"
+        status: ACTIVE
+        module_id: "0237f1dd-6393-43bd-ae52-0a457dc3aaa5"
+        message_ids: 
+          - "8c8eb023-3fe5-467d-9fc3-25f847a724d9"
+          - "f5fc0bcf-9e6d-4522-9b7f-21aa1e1fe1c7"
+          - "3151f6b7-4783-49e9-8dd1-bfca08a44349"
+          - "7cf913f2-256e-4160-a4ce-f0aaeee5e92a"
+          - "3e9aa558-6022-4f1d-af09-3fed197011e0"
+          - "bb4f8bc2-5e46-4950-819b-605783dfa0ff"
+          - "e33d7b62-2bd0-45da-982e-2503bb038080"
+          - "8b42d19c-8d35-4571-bc38-614f86104207"
+          - "ba2a8e44-4d9b-4fd9-b622-4a5af7148fe0"
+          - "bc29f8e2-25d2-4f47-a874-06c930be42b5"

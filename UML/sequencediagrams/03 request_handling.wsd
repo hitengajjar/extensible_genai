@@ -1,0 +1,109 @@
+@startuml
+
+title
+<u>Use Case:</u> Sequence diagram for Starting a chat session and exchanging messages            
+<u>Disclaimer</u>: This diagram is provided for illustrative purposes only and may omit certain 
+   details for clarity and brevity. Users are encouraged to adapt and extend
+   the diagram to fit their specific business requirements and use cases.
+<u>License</u>: https://github.com/hitengajjar/extensible_genai/blob/main/LICENSE.md             
+End title
+
+autonumber
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+skinparam sequenceArrowThickness 2
+
+participant Client as C
+
+box "Serverless Runtime\n Engine" #LightBlue
+participant "View Handlers" as VH
+end box
+
+box "PlatformServices" #LightBlue 
+participant IdP
+participant GenAIService as GenAI
+database DB
+end box
+
+box "Serverless Runtime\n Engine" #LightBlue
+participant "Intention Handlers" as IH
+end box
+
+box LLM Models
+  participant "Generator\n Model" as G
+  participant "Embeddings\n Model" as E
+end box
+
+group User message
+  C -> GenAI: **POST** /session/""//__session_uuid__//""/messages
+  note over GenAI
+    Validate below and proceed if all well
+      - request
+      - quota consumption
+      - validate license 
+      - .. & more
+  end note
+
+  GenAI -> GenAI: generate ""//__message_uuid__//""
+  note over GenAI, DB
+    messages are stored in chronological order
+    and sorted based on the message timestamp
+  end note
+  GenAI -> DB: store message
+  GenAI --> C: **200 OK** {""//__message_uuid__//""}
+
+end
+
+par User Message processing
+  note right of C
+    Client will periodically check for new messages 
+    in parallel to user message processing.
+  end note
+  group Extract relevant chat conversation
+    GenAI -> E: create embeddings for user_query
+    return user_query_embeddings
+    GenAI -> DB: find summary records \nmatching user_query_embeddings
+    return summary_records
+    GenAI -> DB: fetch initial_context\n & intention_handlers definition
+    return initial_context & intention_handlers definition
+
+    GenAI -> GenAI: Fill agent prompt with \n\
+|_ inital_context \n\
+|_ summary_records as part of context \n\
+|_ intention_handlers definition \n\
+|_ user_query
+
+    GenAI -> G: Generate data for agent_prompt
+    
+    Loop till no final answer
+      Alt tool selection (API call)
+        G --> GenAI: invoke intention_handler with id=...
+        GenAI -> IH: **POST** /execute/...
+        IH -> IH: business logic execution
+        Alt Intention Handler wants to generate data using G
+          IH -> IH: fill the intention prompt
+          IH -> GenAI: **POST** /llm/messages
+          GenAI -> G: generate_message
+          return llm_message
+          GenAI --> IH: llm_message
+          note over IH
+            Intention handler may modify the generated data
+          end note
+          IH --> GenAI: tool_message
+        end 
+      Else
+        G --> GenAI: llm_message
+      End 
+    End
+
+    GenAI -> DB: persist llm_message
+    GenAI -> G: generate summary of request/response (user/G) messages
+    return summary
+
+
+    GenAI -> DB: persist summary (of request/response)
+  end
+end
+
+@enduml
