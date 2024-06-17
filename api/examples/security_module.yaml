@@ -45,7 +45,7 @@ components:
         - $ref: "#/components/examples/RemediationActionsIntentionHandler"
       view_handler:
         $ref: '#/components/examples/SecurityWebViewHandler'
-      embeddings_provider:
+      embeddings_generator:
         $ref: '#/components/examples/SecurityEmbeddingsDataGenerator'
       agent_prompt: 
         $ref: '#/components/examples/SecurityAgentPrompt'
@@ -375,15 +375,15 @@ components:
         # Notice: You can provide specific action handlers. 
         # Examples: URL click initiate some backend task, form submission, feedback capture etc.
 
-  # Embeddings Data Generator serverless function
+  # Embeddings Data Generator serverless workflow
     SecurityEmbeddingsDataGenerator:
-      func: 
+      flow: 
         description: Generate embeddings for the feed documents
         id: 4852edb2-5b34-46e2-8557-74b94687fb4e
         name: EmbeddingsGenerator
         lang: GO
         interface_schema:
-          input_params: '{"description":"Document source location","additionalProperties":false,"properties":{"data_location":{"type":"string"},"security_backend_connection":{"type":"object","properties":{"url":{"type":"string"}}}},"required":["data_location"]}'
+          input_params: '{"description":"Document source location","additionalProperties":false,"properties":{"data_location":{"type":"string"},"data_location_secret_id":{"type":"string"},"security_backend_connection":{"type":"object","properties":{"url":{"type":"string"}}}},"required":["data_location"]}'
           returns: '{"description":"Threat updates.","additionalProperties":false,"properties":{"result":{"type":"boolean"}}}'
         source: |-
           ...
@@ -391,6 +391,10 @@ components:
           # 1. Fetch all the documents from the `data_location` and push to GenAI using API `POST /embeddings/documents`
           # 2. Fetch incident details from Security backend system and push to GenAI using API `POST /embeddings/documents`
       cron: 0 0 * * * # 12 midnight every day
+      flow_input: 
+        data_location: https://s3.us-west-2.amazonaws.com/security_docs/ # Assume there is S3 bucket with name security_docs which has frequently updated Security Documents
+        data_location_secret_id: SECURITY_DOCS_ID123 # assume there is Credentials Store service. It takes this cred id to provide access to S3
+        security_backend_connection: https://edr_backend.us2_mycomp.service.consul:9987 # Assume services are discovered using HasiCorp Consul
 
   # Few Live object examples
     SecurityInitialContext:

@@ -29,7 +29,7 @@ C -> R: Register new chat_module \n\
 |_ name: ""//__module_name__//"" \n\
 |_ initial_context_schema: ""//__JSONSchema__//"" \n\
 |_ intention_handlers: ""//__intention_handlers_definitions__//"" \n\
-|_ embeddings_provider: "" //__embeddings_provider_definition__//"" \n\
+|_ embeddings_generator: "" //__embeddings_generator_definition__//"" \n\
 |_ view_handler.message_constructor: ""//__message_constructor_definition__//"" \n\
 |_ view_handler.action_handlers: ""//__action_handler_definitions__//"" \n\
 |_ agent_prompt: ""//__agent_prompt__//""
@@ -42,7 +42,7 @@ R -> GenAI: **POST** /chat_modules \n\
 |_ name: ""//__module_name__//"" \n\
 |_ initial_context_schema: ""//__JSONSchema__//"" \n\
 |_ intention_handlers: ""//__intention_handlers_definitions__//"" \n\
-|_ embeddings_provider: "" //__embeddings_provider_definition__//"" \n\
+|_ embeddings_generator: "" //__embeddings_generator_definition__//"" \n\
 |_ view_handler.message_constructor: ""//__message_constructor_definition__//"" \n\
 |_ view_handler.action_handlers:""//__action_handler_definitions__//"" \n\
 |_ agent_prompt: ""//__agent_prompt__//""
@@ -105,7 +105,7 @@ view_handler:
       interface_schema: input_params: ...
         returns: ...
       source: ...
-embeddings_provider:
+embeddings_generator:
   func: 
     id: 4852edb2-5b34-46e2-8557-74b94687fb4e
     name: EmbeddingsGenerator
@@ -134,7 +134,7 @@ R -> SR: Register \n\
 |_ intention_handler:""//__intention_handlers_definitions__//"" \n\
 |_ message_constructor:""//__message_constructor_definition__//"" \n\
 |_ action_handlers:""//__action_handler_definitions__//"" \n\
-|_ embeddings_provider: "" //__embeddings_provider_definition__//"" \n\
+|_ embeddings_generator: "" //__embeddings_generator_definition__//"" \n\
 SR -> DB: SELECT EXISTS (SELECT 1 FROM \Functions WHERE id = ..);
 return **200 OK** success
 

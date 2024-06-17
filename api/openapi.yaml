@@ -27,7 +27,7 @@ info:
   summary: Its an extensible generic Generative AI platform service.
   description: |-
     Its a platform service that allows to quickly develop Generative AI
-    applications using RAG model.
+    applications using RAG based model.
 
   version: v1.0
   contact:
@@ -152,7 +152,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ChatViewHandler'
-        embeddings_provider:
+        embeddings_generator:
           $ref: '#/components/schemas/EmbeddingsDataGenerator'
         agent_prompt:
           $ref: '#/components/schemas/PromptTmpl'
@@ -436,21 +436,25 @@ components:
                       return ChatResponse{Messages: messages}, nil
                     }
                 # action_handlers: # Notice: You can provide specific action handlers. Examples: URL click initiate some backend task, form submission, feedback capture etc.
-              embeddings_provider:
-                cron: 0 0 * * * # 12 midnight every day
-                func: 
+              embeddings_generator:
+                flow: 
                   description: Generate embeddings for the feed documents
                   id: 4852edb2-5b34-46e2-8557-74b94687fb4e
                   name: EmbeddingsGenerator
                   lang: GO
                   interface_schema:
-                    input_params: '{"description":"Document source location","additionalProperties":false,"properties":{"data_location":{"type":"string"},"security_backend_connection":{"type":"object","properties":{"url":{"type":"string"}}}},"required":["data_location"]}'
+                    input_params: '{"description":"Document source location","additionalProperties":false,"properties":{"data_location":{"type":"string"},"data_location_secret_id":{"type":"string"},"security_backend_connection":{"type":"object","properties":{"url":{"type":"string"}}}},"required":["data_location"]}'
                     returns: '{"description":"Threat updates.","additionalProperties":false,"properties":{"result":{"type":"boolean"}}}'
                   source: |-
                     ...
                     # Logic includes:
                     # 1. Fetch all the documents from the `data_location` and push to GenAI using API `POST /embeddings/documents`
                     # 2. Fetch incident details from Security backend system and push to GenAI using API `POST /embeddings/documents`
+                cron: 0 0 * * * # 12 midnight every day
+                flow_input: 
+                  data_location: https://s3.us-west-2.amazonaws.com/security_docs/ # Assume there is S3 bucket with name security_docs which has frequently updated Security Documents
+                  data_location_secret_id: SECURITY_DOCS_ID123 # assume there is Credentials Store service. It takes this cred id to provide access to S3
+                  security_backend_connection: https://edr_backend.us2_mycomp.service.consul:9987 # Assume services are discovered using HasiCorp Consul
               agent_prompt: |-
                 You are a chatbot designed to assist users with specific cybersecurity features. Below are the supported features and their corresponding serverless function definitions:
 
@@ -504,6 +508,7 @@ components:
           # It will fetch messages from GenAI and construct it using UI elements and return it to the UI. 
           $ref: '#/components/schemas/ServerlessFunc'
         action_handlers:
+          description: This design isn't provide enough information on how exactly to use the action handlers which can be covered as part of another article.
           type: array
           items:
             $ref: '#/components/schemas/ServerlessFunc'
@@ -547,8 +552,10 @@ components:
       description: Embeddings Provider workflow reads the domain data and creates the embeddings for it.
       additionalProperties: false
       properties:
-        func:
+        flow:
           $ref: '#/components/schemas/ServerlessWorkflow'
+        flow_input:
+          description: Embeddings Flow parameters. The data should match the schema provided in `interface_schema.input_params`
         cron:
           description: GenAI will invoke at scheduled time
           schedule: 
