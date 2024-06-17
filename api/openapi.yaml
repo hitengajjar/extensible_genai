@@ -118,8 +118,8 @@ components:
         Each chat module includes 
           - Intention Handler serverless functions or workflows. They handle specific intentions and make the required data available to LLM to generate the final response. 
           - Intitial Context that is set by the client when initiating the chat session
-          - View Handler which allows to configure the View Constructor serverless function and Action Handler serverless functions
-          - Embeddings Provider serverless function which allows to create the embeddings for the domain objects
+          - View Handler which allows to configure the Message Constructor serverless function and Action Handler serverless functions
+          - Embeddings Data Generator serverless workflow which allows to create the embeddings for the domain objects
           - Agent prompts are the prompts used by chatbot to work with the LLM.
 
         Please note, we can extend it for following features:
@@ -128,7 +128,7 @@ components:
           - LLM selector; select LLM (e.g. OpenAI, Google PaLM 2, ..)
           - Agent Memory manager; how to manage the context history 
           - chat history retention rules; how long to keep the history
-          - anonyimizer; assume there are few anonymizer models available to chose from.
+          - anonymizer; applicable when there are anonymizer models to chose from.
       additionalProperties: false
       properties:
         id:
@@ -156,9 +156,9 @@ components:
           $ref: '#/components/schemas/EmbeddingsDataGenerator'
         agent_prompt:
           $ref: '#/components/schemas/PromptTmpl'
-          description: Agent prompt, used by the Chat Module to work with LLM
+          description: Agent prompt, used by the Chat Module to work with LLM.
       required:
-        [id, name, description, initial_context, intention_handlers, agent_prompt]
+        [id, name, description, initial_context_schema, intention_handlers, agent_prompt]
       examples:
         - CyberSecurityChatModule:
             description: CyberSecurityChatModule assists in addressing cybersecurity issues for workstation, addressing issues through chat interface.
@@ -319,11 +319,7 @@ components:
                           "description": "Unique identifier for the workload"
                         }
                       },
-                      "required": [
-                        "session_id",
-                        "incident_id",
-                        "workload_id"
-                      ],
+                      "required": [ "session_id", "incident_id", "workload_id" ],
                       "additionalProperties": false
                     }
               view_handler:
@@ -508,7 +504,11 @@ components:
           # It will fetch messages from GenAI and construct it using UI elements and return it to the UI. 
           $ref: '#/components/schemas/ServerlessFunc'
         action_handlers:
-          description: This design isn't provide enough information on how exactly to use the action handlers which can be covered as part of another article.
+          description: |- 
+            Its assumed that GenAI service supports specific chat action message of custom MIME type `application/genai-action+json`.
+            This MIME type has `action_id` field and free form field to accept any input params.
+            GenAI service would support actions thats already known to it.
+            Detailed working on Action handling is subject of another article and hence further details are skipped.
           type: array
           items:
             $ref: '#/components/schemas/ServerlessFunc'
@@ -549,7 +549,7 @@ components:
         [id, state]
     
     EmbeddingsDataGenerator:
-      description: Embeddings Provider workflow reads the domain data and creates the embeddings for it.
+      description: Embeddings Data Generator workflow reads the domain data and creates the embeddings for it.
       additionalProperties: false
       properties:
         flow:
@@ -711,19 +711,16 @@ components:
               contentEncoding: base64 
 
   examples:
-    SecurityInitialContext:
-      summary: Security chatbot initial context
-      value:
-        incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
-        workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
-        landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
-
     SecurityChatSession:
       summary: Chat Session example
       value:
         id: 64a425c3-a029-48c8-a591-b2bda6c45fc3
         initial_context: 
-          $ref: '#/components/examples/SecurityInitialContext'
+          summary: Security chatbot initial context
+          value:
+            incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
+            workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
+            landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
         created_at: "2024-05-21T17:00:00Z"
         updated_at: "2024-05-21T17:00:00Z"
         status: ACTIVE
@@ -751,19 +748,20 @@ components:
                 type: string
                 format: uuid
                 description: Chat Module ID
-                example: "0237f1dd-6393-43bd-ae52-0a457dc3aaa5"
               initial_context:
                 type: # any
                 description: Initial session context. The value should match the `ChatModule.initial_context`
-                example: 
-                  $ref: '#/components/examples/SecurityInitialContext'
             required:
               [initial_context, module_id]
             examples:
-              - "SecurityContext":
+              - SecurityChatContext:
                   module_id: 64a425c3-a029-48c8-a591-b2bda6c45fc3
                   initial_context: 
-                    $ref: '#/components/examples/SecurityInitialContext'
+                    summary: Security chatbot initial context
+                    value:
+                      incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
+                      workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
+                      landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
 
     ChatMessage:
       content:
@@ -818,7 +816,7 @@ components:
                 properties:
                   llm_model:
                     type: string
-                    example: GPT-4o
+                    # example: GPT-4o
                   token_count: 
                     description: Number of LLM tokens consumed by this chat session
                     type: integer
@@ -949,8 +947,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatSession'
-              example: 
-                $ref: '#/components/examples/SecurityChatSession'
+              examples:
+                SecurityChatSession: 
+                  $ref: '#/components/examples/SecurityChatSession'
 
         '404':
           description: Session ID not found

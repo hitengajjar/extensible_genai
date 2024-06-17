@@ -22,13 +22,18 @@
 # -----------------------------------------------------------------------------
 
 
+## Security Chat Module
+# Its the same example from `openapi.yaml` but here its well structured 
+#  (with additional functions) for easy understanding.
+
 # We need to have following definitions
 # 1. Chat Module
 # 2. Agent Prompt 
 # 3. Initial Context definition
 # 4. IntentionHandler functions
 # 5. View Handler functions
-# 6. Embeddings Data Generator functions
+# 6. Embeddings Data Generator workflow
+
 
 components:
   examples:
@@ -126,11 +131,7 @@ components:
             "description": "Unique identifier for the workload"
           }
         },
-        "required": [
-          "session_id",
-          "incident_id",
-          "workload_id"
-        ],
+        "required": [ "session_id", "incident_id", "workload_id" ],
         "additionalProperties": false
       }
 
@@ -178,7 +179,7 @@ components:
             return response, nil
           }
       context:
-        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+        $ref: '#/components/examples/SecurityIntentionHandlerContextSchema'
 
     ThreatUpdateIntentionHandler:
       func: 
@@ -227,7 +228,7 @@ components:
         
         Please include threats: {{ THREAT_DETAILS }}
       context:
-        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+        $ref: '#/components/examples/SecurityIntentionHandlerContextSchema'
 
     IncidentDetailsIntentionHandler:
       func: 
@@ -247,7 +248,7 @@ components:
         You're a security analyst providing easy to understand incident information for below given incident details.
         Incident details: {{ INCIDENT_DETAILS }}
       context:
-        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+        $ref: '#/components/examples/SecurityIntentionHandlerContextSchema'
     
     RemediationActionsIntentionHandler:
       func: 
@@ -259,7 +260,7 @@ components:
           returns: ... # Provide output schema
         source: ... # Provide your source code here.
       context:
-        $ref: '#components/examples/SecurityIntentionHandlerContextSchema'
+        $ref: '#/components/examples/SecurityIntentionHandlerContextSchema'
 
   # View Handler 
     SecurityWebViewHandler:
@@ -269,8 +270,8 @@ components:
         id: 123e4567-e89b-12d3-a456-426614174001
         name: SecurityWebViewMessageConstructorFunc
         interface_schema:
-            input_params: '{"description":"Chat message content.","additionalProperties":false,"properties":{"message":{"type":"string"}},"required":["message"]}'
-            returns: '{"$schema":"http://json-schema.org/draft-07/schema#","title":"ChatMessages","description":"A collection of messages exchanged over the Chat session","type":"array","items":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","format":"uuid"},"sender":{"description":"Message senders information","$ref":"#/definitions/ChatActor"},"receiver":{"description":"Message receivers information","$ref":"#/definitions/ChatActor"},"msg":{"type":"string","description":"Data in markdown format. You can make this part extensible to support different content-types."},"session_id":{"type":"string","format":"uuid","description":"ChatSession ID. Messages are part of ChatSessions."}},"required":["id","sender","msg","session_id"]},"definitions":{"ChatActor":{"description":"Actor who plays part in the chat message.","type":"object","additionalProperties":false,"properties":{"id":{"type":"string","format":"uuid","description":"Message owner identifier. It could be chatbot (i.e. Chat Modules) ID or actual users ID"},"type":{"description":"Actor type.","type":"string","enum":["BOT","HUMAN"]}},"required":["type"]}}}'
+          input_params: '{"description":"Chat message content.","additionalProperties":false,"properties":{"message":{"type":"string"}},"required":["message"]}'
+          returns: '{"$schema":"http://json-schema.org/draft-07/schema#","title":"ChatMessages","description":"A collection of messages exchanged over the Chat session","type":"array","items":{"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","format":"uuid"},"sender":{"description":"Message senders information","$ref":"#/definitions/ChatActor"},"receiver":{"description":"Message receivers information","$ref":"#/definitions/ChatActor"},"msg":{"type":"string","description":"Data in markdown format. You can make this part extensible to support different content-types."},"session_id":{"type":"string","format":"uuid","description":"ChatSession ID. Messages are part of ChatSessions."}},"required":["id","sender","msg","session_id"]},"definitions":{"ChatActor":{"description":"Actor who plays part in the chat message.","type":"object","additionalProperties":false,"properties":{"id":{"type":"string","format":"uuid","description":"Message owner identifier. It could be chatbot (i.e. Chat Modules) ID or actual users ID"},"type":{"description":"Actor type.","type":"string","enum":["BOT","HUMAN"]}},"required":["type"]}}}'
         source: |- # Notice: Below source is provided as a logical example and correctness isn't checked. Please use it at your own discretion.
           package message_ctors
           import (
@@ -377,6 +378,7 @@ components:
 
   # Embeddings Data Generator serverless workflow
     SecurityEmbeddingsDataGenerator:
+      cron: 0 0 * * * # 12 midnight every day
       flow: 
         description: Generate embeddings for the feed documents
         id: 4852edb2-5b34-46e2-8557-74b94687fb4e
@@ -390,26 +392,22 @@ components:
           # Logic includes:
           # 1. Fetch all the documents from the `data_location` and push to GenAI using API `POST /embeddings/documents`
           # 2. Fetch incident details from Security backend system and push to GenAI using API `POST /embeddings/documents`
-      cron: 0 0 * * * # 12 midnight every day
       flow_input: 
         data_location: https://s3.us-west-2.amazonaws.com/security_docs/ # Assume there is S3 bucket with name security_docs which has frequently updated Security Documents
         data_location_secret_id: SECURITY_DOCS_ID123 # assume there is Credentials Store service. It takes this cred id to provide access to S3
         security_backend_connection: https://edr_backend.us2_mycomp.service.consul:9987 # Assume services are discovered using HasiCorp Consul
 
   # Few Live object examples
-    SecurityInitialContext:
-      summary: Security chatbot initial context
-      value:
-        incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
-        workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
-        landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
-
     SecurityChatSession:
       summary: Chat Session example
       value:
         id: 64a425c3-a029-48c8-a591-b2bda6c45fc3
         initial_context: 
-          $ref: '#/components/examples/SecurityInitialContext'
+          summary: Security chatbot initial context
+          value:
+            incident_id: "0119d953-8f27-4432-8463-1f6481d18916"
+            workstation_id: "0fdd114e-9c45-4e51-9d26-f31b6976d7f7"
+            landing_page: "#/incidents/0119d953-8f27-4432-8463-1f6481d18916/details"
         created_at: "2024-05-21T17:00:00Z"
         updated_at: "2024-05-21T17:00:00Z"
         status: ACTIVE
